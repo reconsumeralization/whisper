@@ -287,7 +287,7 @@ def add_word_timestamps(
     append_punctuations: str = "\"'.。,，!！?？:：”)]}、",
     **kwargs,
 ):
-    if len(segments) == 0:
+    if not segments:
         return
 
     text_tokens = [t for s in segments for t in s["tokens"] if t < tokenizer.eot]

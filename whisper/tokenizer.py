@@ -152,8 +152,7 @@ class Tokenizer:
         for token in tokens:
             if token >= self.timestamp_begin:
                 timestamp = f"<|{(token - self.timestamp_begin) * 0.02:.2f}|>"
-                outputs.append(timestamp)
-                outputs.append([])
+                outputs.extend((timestamp, []))
             else:
                 outputs[-1].append(token)
         return "".join(
@@ -216,13 +215,14 @@ class Tokenizer:
 
     @cached_property
     def all_language_tokens(self) -> Tuple[int]:
-        result = []
-        for token, token_id in zip(
-            self.tokenizer.additional_special_tokens,
-            self.tokenizer.additional_special_tokens_ids,
-        ):
-            if token.strip("<|>") in LANGUAGES:
-                result.append(token_id)
+        result = [
+            token_id
+            for token, token_id in zip(
+                self.tokenizer.additional_special_tokens,
+                self.tokenizer.additional_special_tokens_ids,
+            )
+            if token.strip("<|>") in LANGUAGES
+        ]
         return tuple(result)
 
     @cached_property
@@ -260,10 +260,7 @@ class Tokenizer:
         # allow hyphens "-" and single quotes "'" between words, but not at the beginning of a word
         result = {self.tokenizer.encode(" -")[0], self.tokenizer.encode(" '")[0]}
         for symbol in symbols + list(miscellaneous):
-            for tokens in [
-                self.tokenizer.encode(symbol),
-                self.tokenizer.encode(" " + symbol),
-            ]:
+            for tokens in [self.tokenizer.encode(symbol), self.tokenizer.encode(f" {symbol}")]:
                 if len(tokens) == 1 or symbol in miscellaneous:
                     result.add(tokens[0])
 
@@ -307,7 +304,7 @@ class Tokenizer:
             special = subword_tokens[0] >= self.eot
             with_space = subword.startswith(" ")
             punctuation = subword.strip() in string.punctuation
-            if special or with_space or punctuation or len(words) == 0:
+            if special or with_space or punctuation or not words:
                 words.append(subword)
                 word_tokens.append(subword_tokens)
             else:
@@ -365,14 +362,14 @@ def get_tokenizer(
     tokenizer = build_tokenizer(name=tokenizer_name)
     all_special_ids: List[int] = tokenizer.all_special_ids
     sot: int = all_special_ids[1]
-    translate: int = all_special_ids[-6]
-    transcribe: int = all_special_ids[-5]
-
     langs = tuple(LANGUAGES.keys())
     sot_sequence = [sot]
     if language is not None:
         sot_sequence.append(sot + 1 + langs.index(language))
     if task is not None:
+        translate: int = all_special_ids[-6]
+        transcribe: int = all_special_ids[-5]
+
         sot_sequence.append(transcribe if task == "transcribe" else translate)
 
     return Tokenizer(
